@@ -1,0 +1,153 @@
+'use client';
+
+import { useEffect, useMemo } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix for default marker icons
+const icon = L.icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+// Custom marker colors based on ranking
+const createCustomIcon = (ranking: string) => {
+  const color = ranking.includes('500') ? '#e81c4f' :
+                ranking.includes('600') ? '#2563eb' :
+                ranking.includes('800') ? '#00b4d8' :
+                '#64748b';
+  
+  return L.divIcon({
+    className: 'custom-div-icon',
+    html: `
+      <div style="
+        background-color: ${color};
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 14px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        border: 2px solid white;
+      ">
+        <span style="color: white;">U</span>
+      </div>
+    `,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -15]
+  });
+};
+
+// Map bounds adjuster component
+function MapBoundsAdjuster({ universities }: { universities: University[] }) {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (universities.length > 0) {
+      const bounds = L.latLngBounds(universities.map(u => u.coordinates));
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [map, universities]);
+
+  return null;
+}
+
+type Program = {
+  name: string;
+  duration: string;
+  degree: string;
+  language: string;
+};
+
+type University = {
+  id: string;
+  name: string;
+  city: string;
+  coordinates: [number, number];
+  ranking: string;
+  established: number;
+  programs: Program[];
+  coverImage: string;
+  tuitionRange: [number, number];
+  internationalStudents: number;
+};
+
+type UniversityMapProps = {
+  universities: University[];
+};
+
+export default function UniversityMap({ universities }: UniversityMapProps) {
+  // Default coordinates for Turkey if no universities are provided
+  const defaultCenter: [number, number] = [39.9334, 32.8597];
+  
+  // Add coordinates for each university
+  const universitiesWithCoordinates = universities.map(uni => ({
+    ...uni,
+    coordinates: uni.id === 'istanbul-technical-university' ? [41.1054, 29.0244] :
+                uni.id === 'middle-east-technical-university' ? [39.8915, 32.7805] :
+                defaultCenter
+  }));
+
+  return (
+    <MapContainer 
+      center={defaultCenter} 
+      zoom={6} 
+      style={{ height: '600px', width: '100%' }}
+      scrollWheelZoom={true}
+      className="rounded-lg"
+    >
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+      <MapBoundsAdjuster universities={universitiesWithCoordinates} />
+      {universitiesWithCoordinates.map((university) => (
+        <Marker 
+          key={university.id}
+          position={university.coordinates}
+          icon={createCustomIcon(university.ranking)}
+        >
+          <Popup>
+            <div className="w-64">
+              <img 
+                src={university.coverImage} 
+                alt={university.name}
+                className="w-full h-32 object-cover rounded-t-lg"
+              />
+              <div className="p-3">
+                <h3 className="font-bold text-lg mb-2">{university.name}</h3>
+                <div className="space-y-1 text-sm text-muted-foreground">
+                  <p>📍 {university.city}</p>
+                  <p>🏆 {university.ranking}</p>
+                  <p>📅 Est. {university.established}</p>
+                  <p>💰 ${university.tuitionRange[0].toLocaleString()} - ${university.tuitionRange[1].toLocaleString()}/year</p>
+                  <p>🌍 {university.internationalStudents.toLocaleString()}+ international students</p>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-1">
+                  {university.programs.slice(0, 3).map((program) => (
+                    <span 
+                      key={program.name}
+                      className="inline-block px-2 py-1 text-xs bg-primary/10 text-primary rounded"
+                    >
+                      {program.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+    </MapContainer>
+  );
+}
